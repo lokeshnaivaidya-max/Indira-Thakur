@@ -76,6 +76,12 @@ export default function EditorialAbout() {
     ((config?.about as any)?.secondaryImage?.url && (config?.about as any).secondaryImage.url.trim()) ||
     '';
 
+  const hasSecondaryImage = Boolean(
+    secondaryImageUrl &&
+    secondaryImageUrl.trim().length > 0 &&
+    secondaryImageUrl.trim() !== mainImageUrl.trim()
+  );
+
   useEffect(() => {
     if (mainImageUrl) {
       const p1 = new Image();
@@ -135,23 +141,25 @@ export default function EditorialAbout() {
             </motion.div>
 
             {/* Overlapping Floating Inset Image */}
-            <motion.div
-              initial={{ opacity: 0.95 }}
-              whileInView={{ opacity: 1 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.6 }}
-              className="hidden sm:flex absolute -bottom-8 -right-4 md:-right-8 w-56 md:w-72 min-h-[220px] md:min-h-[280px] bg-[#FAF6F3] p-2 border-4 border-[#FAF6F3] shadow-2xl overflow-hidden rounded-sm z-10 items-center justify-center"
-            >
-              <PolaroidImage
-                src={secondaryImageUrl}
-                alt="Fine Art Photography"
-                fill
-                sizes="300px"
-                objectFit="contain"
-                className="!w-full !h-full"
-                containerClassName="!w-full !h-full"
-              />
-            </motion.div>
+            {hasSecondaryImage && (
+              <motion.div
+                initial={{ opacity: 0.95 }}
+                whileInView={{ opacity: 1 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.6 }}
+                className="hidden sm:flex absolute -bottom-8 -right-4 md:-right-8 w-56 md:w-72 min-h-[220px] md:min-h-[280px] bg-[#FAF6F3] p-2 border-4 border-[#FAF6F3] shadow-2xl overflow-hidden rounded-sm z-10 items-center justify-center"
+              >
+                <PolaroidImage
+                  src={secondaryImageUrl}
+                  alt="Fine Art Photography"
+                  fill
+                  sizes="300px"
+                  objectFit="contain"
+                  className="!w-full !h-full"
+                  containerClassName="!w-full !h-full"
+                />
+              </motion.div>
+            )}
           </div>
 
           {/* Right Column: Bio Narrative & Milestones */}

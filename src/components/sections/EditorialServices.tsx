@@ -17,13 +17,16 @@ function mapServiceToCategory(title: string): string {
   return map[title.toLowerCase()] || title.toLowerCase().replace(/\s+/g, '-');
 }
 
+const WHITE_GOWN_MATERNITY_IMAGE = 'https://images.unsplash.com/photo-1537655780520-1e392ede8122?q=80&w=1200';
+const NEWBORN_IMAGE = 'https://images.unsplash.com/photo-1555252333-9f8e92e65df9?q=80&w=1200';
+
 const DEFAULT_SERVICE_FALLBACKS: Record<string, string> = {
-  'maternity': 'https://images.unsplash.com/photo-1537655780520-1e392ede8122?q=80&w=1200',
-  'maternity portraits': 'https://images.unsplash.com/photo-1537655780520-1e392ede8122?q=80&w=1200',
-  'maternity photography': 'https://images.unsplash.com/photo-1537655780520-1e392ede8122?q=80&w=1200',
-  'newborn': 'https://images.unsplash.com/photo-1555252333-9f8e92e65df9?q=80&w=1200',
-  'newborn storytelling': 'https://images.unsplash.com/photo-1555252333-9f8e92e65df9?q=80&w=1200',
-  'newborn photography': 'https://images.unsplash.com/photo-1555252333-9f8e92e65df9?q=80&w=1200',
+  'maternity': WHITE_GOWN_MATERNITY_IMAGE,
+  'maternity portraits': WHITE_GOWN_MATERNITY_IMAGE,
+  'maternity photography': WHITE_GOWN_MATERNITY_IMAGE,
+  'newborn': NEWBORN_IMAGE,
+  'newborn storytelling': NEWBORN_IMAGE,
+  'newborn photography': NEWBORN_IMAGE,
   'portrait': 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=1200',
   'fine art portraiture': 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=1200',
   'events': 'https://images.unsplash.com/photo-1511795409834-ef04bbd61622?q=80&w=1200',
@@ -34,6 +37,8 @@ function getServiceImageUrl(service: any, categoryMap?: Record<string, string>):
   if (!service) return '';
 
   const titleKey = (service.title || '').toLowerCase().trim();
+  const isMaternity = titleKey.includes('maternity');
+  const isNewborn = titleKey.includes('newborn');
 
   // If service has explicit valid non-placeholder image
   let customUrl = '';
@@ -41,10 +46,34 @@ function getServiceImageUrl(service: any, categoryMap?: Record<string, string>):
   else if (service.image?.url && typeof service.image.url === 'string' && service.image.url.trim().length > 0) customUrl = service.image.url.trim();
   else if (service.image?.src && typeof service.image.src === 'string' && service.image.src.trim().length > 0) customUrl = service.image.src.trim();
   else if (typeof service.imageUrl === 'string' && service.imageUrl.trim().length > 0) customUrl = service.imageUrl.trim();
+  else if (typeof service.heroImage === 'string' && service.heroImage.trim().length > 0) customUrl = service.heroImage.trim();
 
-  // If custom URL is set and doesn't conflict with stale fallback, return it
+  // Filter out mismatching images (e.g. newborn image on maternity service or vice versa)
+  if (isMaternity && (customUrl.includes('photo-1555252333') || customUrl.includes('placeholder'))) {
+    customUrl = '';
+  }
+  if (isNewborn && (customUrl.includes('photo-1537655780520') || customUrl.includes('placeholder'))) {
+    customUrl = '';
+  }
+
   if (customUrl && !customUrl.includes('placeholder')) {
     return customUrl;
+  }
+
+  // Strict mapping for Maternity service -> lady in white gown image
+  if (isMaternity) {
+    if (categoryMap && categoryMap['maternity'] && !categoryMap['maternity'].includes('photo-1555252333')) {
+      return categoryMap['maternity'];
+    }
+    return WHITE_GOWN_MATERNITY_IMAGE;
+  }
+
+  // Strict mapping for Newborn service -> newborn image
+  if (isNewborn) {
+    if (categoryMap && categoryMap['newborn'] && !categoryMap['newborn'].includes('photo-1537655780520')) {
+      return categoryMap['newborn'];
+    }
+    return NEWBORN_IMAGE;
   }
 
   // 1. Resolve from dynamic gallery category map if available

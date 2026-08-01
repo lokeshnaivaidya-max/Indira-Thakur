@@ -16,29 +16,71 @@ export async function POST(request: NextRequest) {
     const user = requireAuth(request);
     if (!user) return jsonError('Unauthorized', 401);
 
-    const formData = await request.formData();
-    const file = formData.get('file') as File | null;
-    if (!file) return jsonError('No file provided', 400);
+    const contentType = request.headers.get('content-type') || '';
+    let url = '';
+    let publicId = '';
+    let filename = '';
+    let folder = 'gallery';
+    let category = '';
+    let title = '';
+    let alt = '';
+    let description = '';
+    let width = 1200;
+    let height = 1600;
+    let featured = false;
+    let order = 0;
+    let size = 0;
+    let type = 'image/jpeg';
 
-    const folder = (formData.get('folder') as string) || 'gallery';
-    const category = (formData.get('category') as string) || '';
-    const title = (formData.get('title') as string) || '';
-    const alt = (formData.get('alt') as string) || '';
-    const width = parseInt((formData.get('width') as string) || '0') || 1200;
-    const height = parseInt((formData.get('height') as string) || '0') || 1600;
-    const featured = formData.get('featured') === 'true';
-    const order = parseInt((formData.get('order') as string) || '0') || 0;
+    if (contentType.includes('application/json')) {
+      const json = await request.json();
+      url = json.url || json.src || '';
+      publicId = json.publicId || '';
+      filename = json.filename || 'uploaded_image';
+      folder = json.folder || 'gallery';
+      category = json.category || '';
+      title = json.title || '';
+      alt = json.alt || '';
+      description = json.description || '';
+      width = parseInt(json.width) || 1200;
+      height = parseInt(json.height) || 1600;
+      featured = Boolean(json.featured);
+      order = parseInt(json.order) || 0;
+      size = json.size || 0;
+      type = json.type || 'image/jpeg';
 
-    const result = await uploadFile(file, folder);
+      if (!url) return jsonError('Missing pre-uploaded image URL', 400);
+    } else {
+      const formData = await request.formData();
+      const file = formData.get('file') as File | null;
+      if (!file) return jsonError('No file provided', 400);
+
+      folder = (formData.get('folder') as string) || 'gallery';
+      category = (formData.get('category') as string) || '';
+      title = (formData.get('title') as string) || '';
+      alt = (formData.get('alt') as string) || '';
+      description = (formData.get('description') as string) || '';
+      width = parseInt((formData.get('width') as string) || '0') || 1200;
+      height = parseInt((formData.get('height') as string) || '0') || 1600;
+      featured = formData.get('featured') === 'true';
+      order = parseInt((formData.get('order') as string) || '0') || 0;
+      filename = file.name;
+      size = file.size;
+      type = file.type || 'image/jpeg';
+
+      const result = await uploadFile(file, folder);
+      url = result.url;
+      publicId = result.publicId;
+    }
 
     let item: Record<string, unknown> = {
       _id: `gallery-${Date.now()}`,
       id: `gallery-${Date.now()}`,
-      src: result.url,
-      publicId: result.publicId,
-      alt: alt || title || file.name.replace(/\.[^/.]+$/, ''),
-      title: title || file.name.replace(/\.[^/.]+$/, ''),
-      description: (formData.get('description') as string) || '',
+      src: url,
+      publicId,
+      alt: alt || title || filename.replace(/\.[^/.]+$/, ''),
+      title: title || filename.replace(/\.[^/.]+$/, ''),
+      description,
       width,
       height,
       category: category || 'Other',
@@ -51,14 +93,14 @@ export async function POST(request: NextRequest) {
         await connectToDatabase();
         const GalleryImage = (await import('@/models/GalleryImage')).default;
         const createdItem = await GalleryImage.create({
-          src: result.url,
-          publicId: result.publicId,
+          src: url,
+          publicId,
           alt: alt || title || '',
           title: title || '',
-          description: (formData.get('description') as string) || '',
+          description,
           width,
           height,
-          category: category || '',
+          category: category || 'Other',
           featured,
           order,
         });
@@ -66,12 +108,12 @@ export async function POST(request: NextRequest) {
 
         const FileRecord = (await import('@/models/FileRecord')).default;
         await FileRecord.create({
-          url: result.url,
-          publicId: result.publicId,
-          filename: file.name.replace(/[^a-zA-Z0-9.-]/g, '_'),
-          originalName: file.name,
-          size: file.size,
-          type: file.type,
+          url,
+          publicId,
+          filename: filename.replace(/[^a-zA-Z0-9.-]/g, '_'),
+          originalName: filename,
+          size,
+          type,
           folder,
         }).catch(() => {});
       } catch (dbErr) {

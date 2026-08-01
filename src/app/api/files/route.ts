@@ -80,19 +80,71 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const formData = await request.formData();
-    const file = formData.get('file') as File;
-    const folder = (formData.get('folder') as string) || 'uploads';
-    const category = (formData.get('category') as string) || '';
-    const title = (formData.get('title') as string) || '';
-    const alt = (formData.get('alt') as string) || '';
+    const contentType = request.headers.get('content-type') || '';
+    let url = '';
+    let publicId = '';
+    let filename = '';
+    let originalName = '';
+    let size = 0;
+    let type = 'image/jpeg';
+    let folder = 'uploads';
+    let category = '';
+    let title = '';
+    let alt = '';
+    let description = '';
+    let width = 1200;
+    let height = 1600;
+    let featured = false;
+    let order = 0;
 
-    if (!file) {
-      return NextResponse.json({ error: 'No file provided' }, { status: 400 });
+    if (contentType.includes('application/json')) {
+      const json = await request.json();
+      url = json.url || json.src || '';
+      publicId = json.publicId || '';
+      filename = json.filename || 'uploaded_image';
+      originalName = json.originalName || filename;
+      size = json.size || 0;
+      type = json.type || 'image/jpeg';
+      folder = json.folder || 'uploads';
+      category = json.category || '';
+      title = json.title || '';
+      alt = json.alt || '';
+      description = json.description || '';
+      width = parseInt(json.width) || 1200;
+      height = parseInt(json.height) || 1600;
+      featured = Boolean(json.featured);
+      order = parseInt(json.order) || 0;
+
+      if (!url) {
+        return NextResponse.json({ error: 'Missing pre-uploaded URL' }, { status: 400 });
+      }
+    } else {
+      const formData = await request.formData();
+      const file = formData.get('file') as File;
+      folder = (formData.get('folder') as string) || 'uploads';
+      category = (formData.get('category') as string) || '';
+      title = (formData.get('title') as string) || '';
+      alt = (formData.get('alt') as string) || '';
+      description = (formData.get('description') as string) || '';
+      width = parseInt((formData.get('width') as string) || '1200') || 1200;
+      height = parseInt((formData.get('height') as string) || '1600') || 1600;
+      featured = formData.get('featured') === 'true';
+      order = parseInt((formData.get('order') as string) || '0') || 0;
+
+      if (!file) {
+        return NextResponse.json({ error: 'No file provided' }, { status: 400 });
+      }
+
+      const result = await uploadFile(file, folder);
+      url = result.url;
+      publicId = result.publicId;
+      filename = file.name;
+      originalName = file.name;
+      size = file.size;
+      type = file.type || 'image/jpeg';
+      width = result.width || width;
+      height = result.height || height;
     }
-
-    const result = await uploadFile(file, folder);
-    const url = result.url;
 
     let dbFileId = `file-${Date.now()}`;
 
@@ -102,11 +154,11 @@ export async function POST(request: Request) {
         const FileRecord = (await import('@/models/FileRecord')).default;
         const dbFile = await FileRecord.create({
           url,
-          publicId: result.publicId,
-          filename: file.name.replace(/[^a-zA-Z0-9.-]/g, '_'),
-          originalName: file.name,
-          size: file.size,
-          type: file.type,
+          publicId,
+          filename: filename.replace(/[^a-zA-Z0-9.-]/g, '_'),
+          originalName,
+          size,
+          type,
           folder,
         });
         dbFileId = dbFile._id.toString();
@@ -116,15 +168,15 @@ export async function POST(request: Request) {
             const GalleryImage = (await import('@/models/GalleryImage')).default;
             await GalleryImage.create({
               src: url,
-              publicId: result.publicId,
-              alt: alt || title || file.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' '),
-              title: title || file.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' '),
-              description: (formData.get('description') as string) || '',
-              width: parseInt((formData.get('width') as string) || '1200') || 1200,
-              height: parseInt((formData.get('height') as string) || '1600') || 1600,
+              publicId,
+              alt: alt || title || filename.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' '),
+              title: title || filename.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' '),
+              description,
+              width,
+              height,
               category: category || 'Other',
-              featured: formData.get('featured') === 'true',
-              order: parseInt((formData.get('order') as string) || '0') || 0,
+              featured,
+              order,
             });
           } catch (galleryErr) {
             console.warn('[Files API] GalleryImage creation skipped/failed:', galleryErr);
@@ -141,14 +193,14 @@ export async function POST(request: Request) {
         id: dbFileId,
         url,
         src: url,
-        publicId: result.publicId,
-        filename: file.name,
-        originalName: file.name,
-        size: file.size,
-        type: file.type,
+        publicId,
+        filename,
+        originalName,
+        size,
+        type,
         folder,
-        width: result.width || 1200,
-        height: result.height || 1600,
+        width,
+        height,
       },
       { status: 201 }
     );
